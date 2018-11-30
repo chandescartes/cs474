@@ -2,7 +2,8 @@ import utils
 import csv
 import os, sys
 
-
+if len(os.listdir('cleaned')) == 0:
+    utils.save_cleaned()
 corpus = utils.Corpus()
 
 
