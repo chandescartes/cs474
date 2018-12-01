@@ -1,11 +1,6 @@
-
-import os, pickle
-
-from utils import Article, Corpus, parse_and_save
+from utils import Corpus
+import csv
+import os, sys
 
 if __name__ == '__main__':
-    if not os.path.isfile(os.path.join("data", "articles.bin")):
-        parse_and_save()
-
-    # articles = pickle.load(open(os.path.join("data", "articles.bin"), "rb"))
-    
+    corpus = Corpus()

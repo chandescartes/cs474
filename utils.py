@@ -1,16 +1,216 @@
-
 import os, sys, datetime
 import json, pickle
 import pandas as pd
-# from tqdm import tqdm
+import numpy as np
+
+from tqdm import tqdm
 from gensim.parsing.preprocessing import *
 from gensim.utils import lemmatize
-# from gensim.corpora import Dictionary
-# import numpy as np
+from gensim.corpora.wikicorpus import WikiCorpus
+from gensim.models import TfidfModel, FastText
+from gensim.corpora import Dictionary
+from gensim.models.phrases import Phrases, Phraser
+import numpy as np
 # import matplotlib.pyplot as plt
 import csv
 
-def parse_and_save():
+dir_dumps = "dumps/"
+dir_data = "data/"
+
+class Article:
+    def __init__(self, title, author, time, body, section):
+        self.title = title
+        self.author = author
+        self.time = time
+        self.body = body
+        self.section = section
+
+        self.title_cleaned = clean(self.title)
+        self.body_cleaned = clean(self.body)
+
+    def __repr__(self):
+        return "<Doc '{}', '{}'>".format(self.title, self.author)
+
+    def __str__(self):
+        return self.__repr__()
+
+class Corpus():
+    def __init__(self):
+        self.name = "corpus.bin"
+        if self.name in os.listdir():
+            with open(self.name, 'rb') as f:
+                c = pickle.load(f)
+                self.articles = c.articles
+                self.phraser = c.phraser
+                self.dict = c.dict
+                self.tfidf = c.tfidf
+            print("corpus loaded")
+        else:
+            self.build_corpus()
+            self.save()
+
+    def build_corpus(self):
+        print("building corpus...")
+        self.tfidf = None
+        if "cleaned.bin" not in os.listdir(dir_dumps):
+            clean_articles()
+        with open(dir_dumps+"cleaned.bin", 'rb') as f:
+            print("collecting articles...")
+            self.articles = pickle.load(f)
+        for article in tqdm(self.articles):
+            article.text = article.section.split() + article.title_cleaned + article.body_cleaned
+
+        self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
+        self.dict = Dict(corpus=self, phraser=phraser).get_dict()
+
+        print("building bows...")
+        for article in tqdm(self.articles):
+            article.bow = self.dict.doc2bow(tokenizer(article.text), phraser=self.phraser)
+
+        self.build_tfidf()
+
+    def build_tfidf(self):
+        print("building tf-idf model...")
+        self.tfidf = TfidfModel(self.get_bows(), dictionary=self.dict, smartirs='atn')
+
+    def get_tfidf(self):
+        return self.tfidf
+
+    def get_texts(self):
+        return [article.text for article in self.articles]
+
+    def get_bows(self):
+        return [article.bow for article in self.articles]
+
+    def save(self):
+        with open(self.name, "wb") as f:
+            pickle.dump(self, f)
+        print("corpus saved")
+
+    # def draw_hist(self):
+    #     hist = np.zeros([5000,])
+    #     for i in self.tfs.values():
+    #         hist[i] += 1
+    #     with open('hist.csv','w',newline='') as csvfile:
+    #         csvwriter = csv.writer(csvfile, delimiter=',')
+    #         csvwriter.writerow(hist)
+
+class PhraserModel():
+    def __init__(self, corpus, name="tri"):
+        self.name = "phraser_" + name + ".bin"
+        self.corpus = corpus
+        if self.name in os.listdir(dir_dumps):
+            with open(dir_dumps + self.name, "rb") as p:
+                print(self.name, " loaded")
+                self.phraser = pickle.load(p)
+        else:
+            print("phraser does not exist")
+            print("start building...")
+            self.build_bigram_phraser()
+            self.save_bigram()
+            with open(dir_dumps + "phraser_bi.bin", "rb") as p:
+                self.bi_phraser = pickle.load(p)
+            self.build_trigram_phraser()
+            self.save_trigram()
+
+    def build_bigram_phraser(self):
+        texts = self.corpus.get_texts()
+        tokens = []
+        start = time.time()
+        tokens += tokenizer(texts)
+        self.phraser = Phraser(Phrases(tokens))
+        end = time.time()
+        print("bigram train finished! ", end-start, " seconds")
+
+    def build_trigram_phraser(self):
+        print('training trigram...')
+        texts = self.corpus.get_texts()
+        tokens = []
+        start = time.time()
+        tokens += self.bi_phraser[tokenizer(texts)]
+        self.phraser = Phraser(Phrases(tokens))
+        end = time.time()
+        print("train finished! ", end-start, " seconds")
+
+    def get_phraser(self):
+        return self.phraser
+
+    def save_bigram(self):
+        with open(dir_dumps + "phraser_bi.bin", "wb") as p:
+            pickle.dump(self.phraser, p)
+        print("saved!")
+
+    def save_trigram(self):
+        with open(dir_dumps + self.name, "wb") as p:
+            pickle.dump(self.phraser, p)
+        print("saved!")
+
+class Dict():
+    def __init__(self, corpus, name="default", phraser=None):
+        self.name = "dictionary_" + name + ".bin"
+        self.corpus = corpus
+        self.phraser = phraser
+        if self.name in os.listdir(dir_dumps):
+            with open(dir_dumps+self.name, 'rb') as dic:
+                self.dict = pickle.load(dic)
+            print("keyword dictionary loaded")
+        else:
+            print("dictionary not exists")
+            print("start building...")
+            self.build_dictionary()
+            self.save()
+
+    def build_dictionary(self):
+        self.dict = Dictionary()
+        texts = self.corpus.get_texts()
+        self.dict.add_documents(tokenizer(texts, phraser=self.phraser))
+
+    def get_dict(self):
+        return self.dict
+
+    def save(self):
+        with open(dir_dumps+self.name, "wb") as dic:
+            pickle.dump(self.dict, dic)
+
+class FastTextModel:
+    def __init__(self, name="default", phraser=None):
+        self.name = "embedding_" + name + ".model"
+        self.phraser = phraser
+        if self.name in os.listdir(dir_embedding):
+            self.get_embedding = FastText.load(dir_embedding+self.name)
+            print("Embedding {} loaded".format(name))
+        else:
+            print("embedding not exists")
+            print("start building...")
+            self.build_embedding()
+            self.save()
+
+    def build_embedding(self):
+        tickers = [i for i in os.listdir(dir_cleaned_news) if i.endswith(".csv")]
+        tokenized_docs = []
+        start = time.time()
+        for ticker in tickers:
+            df = pd.read_csv(dir_cleaned_news + ticker)
+            tokenized_docs += tokenizer(df['content'], self.phraser)
+
+        self.get_embedding = FastText(tokenized_docs, sg=1, hs=1)
+        end = time.time()
+
+        print("train finished! ", end-start, " seconds")
+
+    # 저장
+    def save(self):
+        self.get_embedding.save(dir_embedding+self.name)
+        print("saved!")
+
+class Window():
+    def __init__(self, start_date, delta, articles):
+        self.start_date = start_date
+        self.end_date = start_date + delta # FIXME
+        self.articles = [article for article in articles if article.date > self.start_date and sarticle.date < self.end_date]
+
+def clean_articles():
+    print("cleaning articles...")
     dfs = []
     for file in os.listdir("data"):
         if file.endswith(".json"):
@@ -19,7 +219,7 @@ def parse_and_save():
 
     articles = []
 
-    for df in dfs:
+    for df in tqdm(dfs):
         print("\nDF")
         for i in range(df.shape[0]):
             title = df['title'][i].strip()
@@ -32,133 +232,36 @@ def parse_and_save():
             articles.append(article)
             print(i, end=" ")
 
-    path = os.path.join("data", "cleaned.bin")
+    path = os.path.join(dir_dumps, "cleaned.bin")
     print("Saved {} articles into {}".format(len(articles), path))
     pickle.dump(articles, open(path, "wb+"))
 
-class Corpus():
-    def __init__(self):
-        self.name = "corpus.bin"
-        if self.name in os.listdir():
-            with open(self.name, 'rb') as f:
-                tmp = pickle.load(f)
-                self.dict = tmp.dict
-                self.corpus = tmp.corpus
-                self.tfs = tmp.tfs
-                self.tfs_baseball = tmp.tfs_baseball
-                self.tfs_hockey = tmp.tfs_hockey
-                self.length = tmp.length
-                self.length_baseball = tmp.length_baseball
-                self.length_hockey = tmp.length_hockey
-                self.num_baseball = tmp.num_baseball
-                self.num_hockey = tmp.num_hockey
-            print("corpus loaded")
+def clean(text):
+    blacklist = ['be', 'do', 're']
+    try:
+        text = strip_multiple_whitespaces(strip_non_alphanum(text)).split()
+    except:
+        text = []
+    words = []
+    for word in text:
+        tmp = lemmatize(word)
+        if tmp:
+            try:
+                if tmp[0][:-3].decode("ISO-8859-1") in blacklist:
+                    continue
+                words.append(tmp[0][:-3].decode("ISO-8859-1"))
+            except:
+                continue
+    return " ".join(words)
+
+def tokenizer(texts, phraser=None):
+    tokenized = []
+    for text in texts:
+        if type(text) is str:
+            if phraser:
+                tokenized += [token for token in phraser[[text.split()]]]
+            else:
+                tokenized += [text.split()]
         else:
-            print("building corpus...")
-            self.build_corpus()
-            self.save()
-            print("corpus saved")
-
-    def build_corpus(self):
-        self.dict = Dictionary()
-        self.corpus = []
-        self.tfs = {}
-        self.tfs_baseball = {}
-        self.tfs_hockey = {}
-        self.length = 0
-        self.length_baseball = 0
-        self.length_hockey = 0
-        self.num_baseball = 0
-        self.num_hockey = 0
-        txts = [i for i in os.listdir(dir_cleaned) if i.endswith(".txt")]
-        print("collecting documents...")
-        for txt in tqdm(txts):
-            doc = read_file(dir_cleaned+txt).split()
-            self.dict.add_documents([doc])
-            self.length += len(doc)
-            if txt.startswith("baseball"):
-                self.corpus.append(Doc(0,doc))
-                self.length_baseball += len(doc)
-                self.num_baseball += 1
-            elif txt.startswith("hockey"):
-                self.corpus.append(Doc(1,doc))
-                self.length_hockey += len(doc)
-                self.num_hockey += 1
-        print("counting tfs...")
-        for d in tqdm(self.corpus):
-            for t, tf in d.tfs.items():
-                if d.collection == 0:
-                    if t in self.tfs_baseball:
-                        self.tfs_baseball[t] += tf
-                        self.tfs[t] += tf
-                    else:
-                        self.tfs_baseball[t] = tf
-                        if t in self.tfs:
-                            self.tfs[t] += tf
-                        else:
-                            self.tfs[t] = tf
-                else:
-                    if t in self.tfs_hockey:
-                        self.tfs_hockey[t] += tf
-                        self.tfs[t] += tf
-                    else:
-                        self.tfs_hockey[t] = tf
-                        if t in self.tfs:
-                            self.tfs[t] += tf
-                        else:
-                            self.tfs[t] = tf
-    def save(self):
-        with open(self.name, "wb") as f:
-            pickle.dump(self, f)
-
-
-    def draw_hist(self):
-        hist = np.zeros([5000,])
-        for i in self.tfs.values():
-            hist[i] += 1
-        with open('hist.csv','w',newline='') as csvfile:
-            csvwriter = csv.writer(csvfile, delimiter=',')
-            csvwriter.writerow(hist)
-
-
-class Article:
-    def __init__(self, title, author, time, body, section):
-        self.title = title
-        self.author = author
-        self.time = time
-        self.body = body
-        self.section = section
-
-    def __repr__(self):
-        return "<Doc '{}', '{}'>".format(self.title, self.author)
-
-    def __str__(self):
-        return self.__repr__()
-
-    # def clean(self, text):
-    #     cleaned = lemmatize(text)
-    #     return cleaned
-
-    # blacklist = ['be', 'do', 're']
-
-    # def clean(text):
-    #     try:
-    #         tmp = text.split()
-    #         for i in range(len(tmp)):
-    #             if '@' in tmp[i]:
-    #                 tmp[i] = ' '
-    #         text = ' '.join(tmp)
-    #         text = strip_multiple_whitespaces(strip_non_alphanum(text)).split()
-    #     except:
-    #         text = []
-    #     words = []
-    #     for word in text:
-    #         tmp = lemmatize(word)
-    #         if tmp:
-    #             try:
-    #                 if tmp[0][:-3].decode("ISO-8859-1") in blacklist:
-    #                     continue
-    #                 words.append(tmp[0][:-3].decode("ISO-8859-1"))
-    #             except:
-    #                 continue
-    #     return " ".join(words)
+            continue
+    return tokenized
