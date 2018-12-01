@@ -61,7 +61,7 @@ class Corpus():
             article.text = article.section + article.title_cleaned + article.body_cleaned
 
         self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
-        self.dict = Dict(corpus=self, phraser=phraser).get_dict()
+        self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
         print("building bows...")
         for article in tqdm(self.articles):
