@@ -58,7 +58,7 @@ class Corpus():
             print("collecting articles...")
             self.articles = pickle.load(f)
         for article in tqdm(self.articles):
-            article.text = article.section.split() + article.title_cleaned + article.body_cleaned
+            article.text = article.section + article.title_cleaned + article.body_cleaned
 
         self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         self.dict = Dict(corpus=self, phraser=phraser).get_dict()
