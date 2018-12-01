@@ -1,37 +1,40 @@
-import os, sys
-import pickle
-from tqdm import tqdm
+
+import os, sys, datetime
+import json, pickle
+import pandas as pd
+# from tqdm import tqdm
 from gensim.parsing.preprocessing import *
 from gensim.utils import lemmatize
-from gensim.corpora import Dictionary
-import numpy as np
-import matplotlib.pyplot as plt
+# from gensim.corpora import Dictionary
+# import numpy as np
+# import matplotlib.pyplot as plt
 import csv
 
-blacklist = ['be', 'do', 're']
+def parse_and_save():
+    dfs = []
+    for file in os.listdir("data"):
+        if file.endswith(".json"):
+            with open(os.path.join("data", file), "r") as f:
+                dfs.append(pd.DataFrame.from_dict(json.load(f)))
 
-def clean(text):
-    try:
-        tmp = text.split()
-        for i in range(len(tmp)):
-            if '@' in tmp[i]:
-                tmp[i] = ' '
-        text = ' '.join(tmp)
-        text = strip_multiple_whitespaces(strip_non_alphanum(text)).split()
-    except:
-        text = []
-    words = []
-    for word in text:
-        tmp = lemmatize(word)
-        if tmp:
-            try:
-                if tmp[0][:-3].decode("ISO-8859-1") in blacklist:
-                    continue
-                words.append(tmp[0][:-3].decode("ISO-8859-1"))
-            except:
-                continue
-    return " ".join(words)
+    articles = []
 
+    for df in dfs:
+        print("\nDF")
+        for i in range(df.shape[0]):
+            title = df['title'][i].strip()
+            author = df[' author'][i].strip()
+            time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+            body = df[' body'][i].strip()
+            section = df[' section'][i].strip()
+
+            article = Article(title, author, time, body, section)
+            articles.append(article)
+            print(i, end=" ")
+
+    path = os.path.join("data", "cleaned.bin")
+    print("Saved {} articles into {}".format(len(articles), path))
+    pickle.dump(articles, open(path, "wb+"))
 
 class Corpus():
     def __init__(self):
@@ -118,13 +121,44 @@ class Corpus():
             csvwriter.writerow(hist)
 
 
-class Doc():
-    def __init__(self, collection, doc):
-        self.collection = collection
-        self.doc = doc
-        self.tfs = {}
-        for t in doc:
-            if t in self.tfs:
-                self.tfs[t] += 1
-            else:
-                self.tfs[t] = 1
+class Article:
+    def __init__(self, title, author, time, body, section):
+        self.title = title
+        self.author = author
+        self.time = time
+        self.body = body
+        self.section = section
+
+    def __repr__(self):
+        return "<Doc '{}', '{}'>".format(self.title, self.author)
+
+    def __str__(self):
+        return self.__repr__()
+
+    # def clean(self, text):
+    #     cleaned = lemmatize(text)
+    #     return cleaned
+
+    # blacklist = ['be', 'do', 're']
+
+    # def clean(text):
+    #     try:
+    #         tmp = text.split()
+    #         for i in range(len(tmp)):
+    #             if '@' in tmp[i]:
+    #                 tmp[i] = ' '
+    #         text = ' '.join(tmp)
+    #         text = strip_multiple_whitespaces(strip_non_alphanum(text)).split()
+    #     except:
+    #         text = []
+    #     words = []
+    #     for word in text:
+    #         tmp = lemmatize(word)
+    #         if tmp:
+    #             try:
+    #                 if tmp[0][:-3].decode("ISO-8859-1") in blacklist:
+    #                     continue
+    #                 words.append(tmp[0][:-3].decode("ISO-8859-1"))
+    #             except:
+    #                 continue
+    #     return " ".join(words)
