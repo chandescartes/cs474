@@ -65,7 +65,7 @@ class Corpus():
 
         print("building bows...")
         for article in tqdm(self.articles):
-            article.bow = self.dict.doc2bow(tokenizer(article.text), phraser=self.phraser)
+            article.bow = self.dict.doc2bow(tokenizer(article.text, phraser=self.phraser))
 
         self.build_tfidf()
 
