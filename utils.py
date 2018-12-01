@@ -2,17 +2,15 @@ import os, sys, datetime, time
 import json, pickle
 import pandas as pd
 import numpy as np
-
 from tqdm import tqdm
+import csv
+# import matplotlib.pyplot as plt
+
+
 from gensim.parsing.preprocessing import *
-from gensim.utils import lemmatize
-from gensim.corpora.wikicorpus import WikiCorpus
-from gensim.models import TfidfModel, FastText
+from gensim.models import TfidfModel
 from gensim.corpora import Dictionary
 from gensim.models.phrases import Phrases, Phraser
-import numpy as np
-# import matplotlib.pyplot as plt
-import csv
 
 dir_dumps = "dumps/"
 dir_data = "data/"
@@ -34,11 +32,13 @@ class Article:
     def __str__(self):
         return self.__repr__()
 
-class Corpus():
-    def __init__(self):
+class Corpus:
+    def __init__(self, use_phraser=False):
+        self.use_phraser = use_phraser
         self.name = "corpus.bin"
         if self.name in os.listdir(dir_dumps):
-            with open(self.name, 'rb') as f:
+            print("loading corpus...")
+            with open(dir_dumps+self.name, 'rb') as f:
                 c = pickle.load(f)
                 self.articles = c.articles
                 self.phraser = c.phraser
@@ -58,9 +58,11 @@ class Corpus():
             print("collecting articles...")
             self.articles = pickle.load(f)
         for article in tqdm(self.articles):
-            article.text = article.section + article.title_cleaned + article.body_cleaned
-
-        self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
+            article.text = ' '.join(article.section.split(' ') + article.title_cleaned.split(' ') + article.body_cleaned.split(' '))
+        if self.use_phraser:
+            self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
+        else:
+            self.phraser = None
         self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
         print("building bows...")
@@ -95,7 +97,7 @@ class Corpus():
     #         csvwriter = csv.writer(csvfile, delimiter=',')
     #         csvwriter.writerow(hist)
 
-class PhraserModel():
+class PhraserModel:
     def __init__(self, corpus, name="tri"):
         self.name = "phraser_" + name + ".bin"
         self.corpus = corpus
@@ -145,7 +147,7 @@ class PhraserModel():
             pickle.dump(self.phraser, p)
         print("saved!")
 
-class Dict():
+class Dict:
     def __init__(self, corpus, name="default", phraser=None):
         self.name = "dictionary_" + name + ".bin"
         self.corpus = corpus
@@ -172,38 +174,67 @@ class Dict():
         with open(dir_dumps+self.name, "wb") as dic:
             pickle.dump(self.dict, dic)
 
-class FastTextModel:
-    def __init__(self, name="default", phraser=None):
-        self.name = "embedding_" + name + ".model"
-        self.phraser = phraser
-        if self.name in os.listdir(dir_embedding):
-            self.get_embedding = FastText.load(dir_embedding+self.name)
-            print("Embedding {} loaded".format(name))
-        else:
-            print("embedding not exists")
-            print("start building...")
-            self.build_embedding()
-            self.save()
 
-    def build_embedding(self):
-        tickers = [i for i in os.listdir(dir_cleaned_news) if i.endswith(".csv")]
-        tokenized_docs = []
-        start = time.time()
-        for ticker in tickers:
-            df = pd.read_csv(dir_cleaned_news + ticker)
-            tokenized_docs += tokenizer(df['content'], self.phraser)
+# tf idf 값을 통해 키워드를 추출함 - 점수 자체도 고려
+class Extractor:
+    def __init__(self, corpus):
+        self.corpus = corpus
+        self.tfidf = corpus.tfidf
+        self.dict = corpus.dict
+        self.phraser = corpus.phraser
+        self.articles = corpus.articles
+        self.bows = corpus.get_bows()
 
-        self.get_embedding = FastText(tokenized_docs, sg=1, hs=1)
-        end = time.time()
+    def extract(self, k=10):
+        print("extracting keywords...")
 
-        print("train finished! ", end-start, " seconds")
+        for article in tqdm(self.articles):
+            check = {}
+            vector = self.tfidf[article.bow]
+            for word, score in [(self.dict[i[0]], i[1]) for i in vector]:
+                if score < 0:
+                    continue
+                if word not in check.keys():
+                    check[word] = np.log(score)
+                    continue
+                check[word] += np.log(score)
+            keywords = [(np.log(score) / np.log(2), word) for word, score in check.items() if score > 0]
+            keywords.sort(reverse=True)
+            article.keywords = keywords[:k]
 
-    # 저장
-    def save(self):
-        self.get_embedding.save(dir_embedding+self.name)
-        print("saved!")
 
-class Window():
+# class FastTextModel:
+#     def __init__(self, name="default", phraser=None):
+#         self.name = "embedding_" + name + ".model"
+#         self.phraser = phraser
+#         if self.name in os.listdir(dir_embedding):
+#             self.get_embedding = FastText.load(dir_embedding+self.name)
+#             print("Embedding {} loaded".format(name))
+#         else:
+#             print("embedding not exists")
+#             print("start building...")
+#             self.build_embedding()
+#             self.save()
+#
+#     def build_embedding(self):
+#         tickers = [i for i in os.listdir(dir_cleaned_news) if i.endswith(".csv")]
+#         tokenized_docs = []
+#         start = time.time()
+#         for ticker in tickers:
+#             df = pd.read_csv(dir_cleaned_news + ticker)
+#             tokenized_docs += tokenizer(df['content'], self.phraser)
+#
+#         self.get_embedding = FastText(tokenized_docs, sg=1, hs=1)
+#         end = time.time()
+#
+#         print("train finished! ", end-start, " seconds")
+#
+#     # 저장
+#     def save(self):
+#         self.get_embedding.save(dir_embedding+self.name)
+#         print("saved!")
+
+class Window:
     def __init__(self, start_date, delta, articles):
         self.start_date = start_date
         self.end_date = start_date + delta # FIXME
@@ -235,22 +266,46 @@ def clean_articles():
     pickle.dump(articles, open(path, "wb+"))
 
 def clean(text):
-    blacklist = ['be', 'do', 're']
-    try:
-        text = strip_multiple_whitespaces(strip_non_alphanum(text)).split()
-    except:
-        text = []
-    words = []
-    for word in text:
-        tmp = lemmatize(word)
-        if tmp:
-            try:
-                if tmp[0][:-3].decode("ISO-8859-1") in blacklist:
-                    continue
-                words.append(tmp[0][:-3].decode("ISO-8859-1"))
-            except:
-                continue
-    return " ".join(words)
+    lemmatizer = WordNetLemmatizer()
+    stop_words = set(stopwords.words('english'))
+    pos_to_wordnet = {
+        'JJ'    : wordnet.ADJ,
+        'JJR'   : wordnet.ADJ,
+        'JJS'   : wordnet.ADJ,
+        'RB'    : wordnet.ADV,
+        'RBR'   : wordnet.ADV,
+        'RBS'   : wordnet.ADV,
+        'NN'    : wordnet.NOUN,
+        'NNP'   : wordnet.NOUN,
+        'NNS'   : wordnet.NOUN,
+        'NNPS'  : wordnet.NOUN,
+        'VB'    : wordnet.VERB,
+        'VBG'   : wordnet.VERB,
+        'VBD'   : wordnet.VERB,
+        'VBN'   : wordnet.VERB,
+        'VBP'   : wordnet.VERB,
+        'VBZ'   : wordnet.VERB,
+    }
+
+    text_stripped = strip_multiple_whitespaces(re.sub(r'\d+', '', text))
+    chunks = ne_chunk(pos_tag(word_tokenize(text_stripped)))
+    chunks = [p for p in chunks \
+        if isinstance(p, Tree) \
+        or (p[1] in pos_to_wordnet and strip_non_alphanum(p[0]).strip())]
+
+    cleaned = []
+
+    for chunk in chunks:
+        if isinstance(chunk, Tree):
+            cleaned.append("^{}".format("_".join([w for w, p in chunk.leaves()])))
+        else:
+            if chunk[1] in pos_to_wordnet:
+                wordnet_pos = pos_to_wordnet.get(chunk[1])
+                cleaned.append(lemmatizer.lemmatize(chunk[0], wordnet_pos))
+            else:
+                cleaned.append(lemmatizer.lemmatize(chunk[0]))
+
+    return " ".join(cleaned)
 
 def tokenizer(texts, phraser=None):
     tokenized = []
