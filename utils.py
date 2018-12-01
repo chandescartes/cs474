@@ -34,7 +34,6 @@ class Article:
     def __str__(self):
         return self.__repr__()
 
-
 class Corpus():
     def __init__(self):
         self.name = "corpus.bin"
