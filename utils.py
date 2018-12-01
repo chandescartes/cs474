@@ -37,7 +37,7 @@ class Article:
 class Corpus():
     def __init__(self):
         self.name = "corpus.bin"
-        if self.name in os.listdir():
+        if self.name in os.listdir(dir_dumps):
             with open(self.name, 'rb') as f:
                 c = pickle.load(f)
                 self.articles = c.articles
@@ -61,11 +61,11 @@ class Corpus():
             article.text = article.section + article.title_cleaned + article.body_cleaned
 
         self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
-        self.dict = Dict(corpus=self, phraser=phraser).get_dict()
+        self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
         print("building bows...")
         for article in tqdm(self.articles):
-            article.bow = self.dict.doc2bow(tokenizer(article.text), phraser=self.phraser)
+            article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
         self.build_tfidf()
 
@@ -83,7 +83,7 @@ class Corpus():
         return [article.bow for article in self.articles]
 
     def save(self):
-        with open(self.name, "wb") as f:
+        with open(dir_dumps+self.name, "wb") as f:
             pickle.dump(self, f)
         print("corpus saved")
 
