@@ -10,46 +10,41 @@ Python codes are written in version 3.6.5
 ### Prerequisites
 
 ```
-pip install -r requirements.txt
+$ pip install -r requirements.txt
+$ python nltk.py
 ```
-**[Optional]** Install pattern - dependency for using gensim.utils.lemmatize (Required if you want to preprocess texts yourself. Preprocessed texts are pre-included in /cleaned)
+**[Optional]**
+
+To witness execution from preprocessing, remove all dump files
 ```
-sudo apt-get install libmariadbclient-dev
-git clone -b development https://github.com/clips/pattern
-cd pattern
-sudo python setup.py install
+$ cd dumps
+$ rm *
 ```
 
 ### Running the Codes
 Blah
 ```
-python main.py [option]
+$ python main.py
 ```
 Results are saved as result.csv
 
 #### Options:
-- ```-p``` Set an even number population size (default=30)
-- ```-f``` Set fitness evaluation limit
-- ```-r``` Set mutation rate (0.0 ~ 1.0, default=0.1)
-- ```-k``` Set mutation limit per child (default=10)
-- ```-s``` Show progress
-- ```-e``` Use elitism (default=generational_replacement)
+- `-p` use phraser
 
 
 ### Table of Contents
-Main python source
-```
-/main.py
-```
-Python implementation of Genetic Algorithm
-```
-/ga.py
-```
+- `data/` directory for given article data
+- `dumps/` directory for dump files
+- `main.py` Main python source
+- `utils.py` Python implementation of text mining tools
+- `nltk.py` nltk download script
+- `requirement.txt` python package dependencies
 
 
 ### Built With
 
-* [Gensim](https://github.com/RaRe-Technologies/gensim) - Topic Modelling Library for Python
+* [Gensim](https://radimrehurek.com/gensim/) - Topic Modelling Library for Python - [GitHub](https://github.com/RaRe-Technologies/gensim)
+* [NLTK](https://www.nltk.org/) - Natural Language Toolkit - [GitHub](https://github.com/nltk/nltk)
 
 
 **Copyright (C) 2018 CS474 Team #16**
