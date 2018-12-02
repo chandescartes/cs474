@@ -1,11 +1,21 @@
-from utils import Corpus, Extractor
+from utils import Corpus, Extractor, TopicModel
 import csv
 import os, sys
 
 if __name__ == '__main__':
     corpus = Corpus()
     hdp = corpus.hdp
-    print(hdp[corpus.articles[0].bow])   
+    tm = TopicModel(corpus, hdp)
+
+    # for i in range(10):
+    #     print("TEXT: ",corpus.articles[i].text)
+    #     topics = hdp[corpus.articles[i].bow]
+    #     for topic in topics:
+    #         print(corpus.dict[topic[0]])
+
+
+
+
     # for idx, article in enumerate(corpus.articles):
     #     if idx >= 50:
     #         break
@@ -25,3 +35,13 @@ if __name__ == '__main__':
     #         print(tmp)
     #     except:
     #         print("word not found!")
+
+
+
+
+# TODO
+# options = {
+#     -c: build new clened.bin
+#     -p: use phrase
+#     -t: use title topic model
+# }

@@ -6,14 +6,11 @@ from tqdm import tqdm
 import csv
 # import matplotlib.pyplot as plt
 
-from nltk import word_tokenize, sent_tokenize, pos_tag, ne_chunk, ne_chunk_sents
-from nltk.corpus import stopwords, wordnet
-from nltk.tree import Tree
-from nltk.stem.wordnet import WordNetLemmatizer
 from gensim.parsing.preprocessing import *
 from gensim.models import TfidfModel, HdpModel, LdaModel
 from gensim.corpora import Dictionary
-from gensim.models.phrases import Phrases, Phraser
+
+
 
 dir_dumps = "dumps/"
 dir_data = "data/"
@@ -36,8 +33,10 @@ class Article:
         return self.__repr__()
 
 class Corpus:
-    def __init__(self, use_phraser=False):
+    def __init__(self, use_phraser=False, title_weight=5):
         self.use_phraser = use_phraser
+        self.use_title = use_title
+        self.title_weight = title_weight
         self.name = "corpus.bin"
         if self.name in os.listdir(dir_dumps):
             print("loading corpus...")
@@ -47,6 +46,7 @@ class Corpus:
                 self.phraser = c.phraser
                 self.dict = c.dict
                 self.tfidf = c.tfidf
+                self.hdp = c.hdp
             print("corpus loaded")
         else:
             self.build_corpus()
@@ -61,7 +61,8 @@ class Corpus:
             print("collecting articles...")
             self.articles = pickle.load(f)
         for article in tqdm(self.articles):
-            article.text = ' '.join(article.section.split(' ') + article.title_cleaned.split(' ') + article.body_cleaned.split(' '))
+            title = article.title_cleaned.split() * self.title_weight
+            article.text = ' '.join(article.section.split() + title + article.body_cleaned.split()) 
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
@@ -116,6 +117,8 @@ class Corpus:
 
 class PhraserModel:
     def __init__(self, corpus, name="tri"):
+        from gensim.models.phrases import Phrases, Phraser
+
         self.name = "phraser_" + name + ".bin"
         self.corpus = corpus
         if self.name in os.listdir(dir_dumps):
@@ -165,8 +168,8 @@ class PhraserModel:
         print("saved!")
 
 class Dict:
-    def __init__(self, corpus, name="default", phraser=None):
-        self.name = "dictionary_" + name + ".bin"
+    def __init__(self, corpus, phraser=None):
+        self.name = "dictionary.bin"
         self.corpus = corpus
         self.phraser = phraser
         if self.name in os.listdir(dir_dumps):
@@ -250,6 +253,52 @@ class Extractor:
 #         self.get_embedding.save(dir_embedding+self.name)
 #         print("saved!")
 
+
+class TopicModel:
+    def __init__(self, corpus, model):
+        self.name = "topic_model_collections.bin"
+        self.corpus = corpus
+        self.model = model
+
+        if self.name in os.listdir(dir_dumps):
+            print("loading collections...")
+            with open(dir_dumps + self.name, "rb") as p:
+                print(self.name, " loaded")
+                self.collections = pickle.load(p)
+
+        else:
+            self.build_collections()
+            self.save_collections()
+
+
+    def build_collections(self):
+        print("building collections...")
+        self.collections = [[] for i in range(self.model.get_topics().shape[0])]
+
+        articles = self.corpus.articles
+
+        for article in tqdm(articles):
+            vector = self.model[article.bow]
+            vector.sort(key=lambda p : p[1], reverse=True)
+            article.topic = vector[0]
+            self.collections[article.topic[0]].append(article)
+
+
+    def save_collections(self):
+        with open(dir_dumps+self.name, "wb") as f:
+            pickle.dump(self.collections, f)
+        print("collection saved")
+
+
+    def show_collections(self):
+        for idx, collection in enumerate(self.collections):
+            print(">>>",idx,"\tTOPIC: ",self.model.print_topic(idx))
+            for idx, article in enumerate(collection):
+                print("\t",idx,"\t",article.title)
+
+
+
+
 class Window:
     def __init__(self, start_date, delta, articles):
         self.start_date = start_date
@@ -282,6 +331,11 @@ def clean_articles():
     pickle.dump(articles, open(path, "wb+"))
 
 def clean(text):
+    from nltk import word_tokenize, sent_tokenize, pos_tag, ne_chunk, ne_chunk_sents
+    from nltk.corpus import stopwords, wordnet
+    from nltk.tree import Tree
+    from nltk.stem.wordnet import WordNetLemmatizer
+
     lemmatizer = WordNetLemmatizer()
     stop_words = set(stopwords.words('english'))
     pos_to_wordnet = {
