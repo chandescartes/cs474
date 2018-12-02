@@ -1,11 +1,17 @@
-from utils import Corpus, Extractor
-import csv
+from utils import Corpus, Extractor, clean
+import csv, pickle
 import os, sys
 
+from collections import defaultdict
+
 if __name__ == '__main__':
-    corpus = Corpus()
-    hdp = corpus.hdp
-    print(hdp[corpus.articles[0].bow])   
+    # corpus = Corpus()
+    # lda = corpus.lda
+
+    # topics = lda.get_topics()
+
+    # print(topics[:10])
+
     # for idx, article in enumerate(corpus.articles):
     #     if idx >= 50:
     #         break
@@ -25,3 +31,17 @@ if __name__ == '__main__':
     #         print(tmp)
     #     except:
     #         print("word not found!")
+
+    articles = pickle.load(open(os.path.join("dumps", "cleaned.bin"), "rb"))
+
+    for i, article in enumerate(articles):
+    	print(article.body)
+    	print(clean(article.body), end="\n\n")
+
+    	if i == 15: break
+
+    # sections = defaultdict(int)
+
+    # for article in articles:
+    # 	sections[article.section] += 1
+    # print(sections)
