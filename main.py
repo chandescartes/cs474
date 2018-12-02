@@ -3,7 +3,7 @@ import csv
 import os, sys
 
 if __name__ == '__main__':
-    corpus = Corpus(use_title=True)
+    corpus = Corpus()
     hdp = corpus.hdp
     tm = TopicModel(corpus, hdp)
 
