@@ -73,8 +73,8 @@ class Corpus:
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
         # self.build_tfidf()
-        # self.build_hdp()
-        self.build_lda()
+        self.build_hdp()
+        # self.build_lda()
 
     def build_tfidf(self):
         print("building tf-idf model...")
