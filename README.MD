@@ -38,7 +38,7 @@ Results are saved as result.csv
 - `main.py` Main python source
 - `utils.py` Python implementation of text mining tools
 - `nltk.py` nltk download script
-- `requirement.txt` python package dependencies
+- `requirements.txt` python package dependencies
 
 
 ### Built With
