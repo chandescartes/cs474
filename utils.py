@@ -344,7 +344,16 @@ def clean_articles(parallel=False):
         for articlelist in articleset:
             articles += articlelist
     else:
-        pass
+        for df in dfs:
+            for i in tqdm(range(df.shape[0])):
+                title = df['title'][i].strip()
+                author = df[' author'][i].strip()
+                time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+                body = df[' body'][i].strip()
+                section = df[' section'][i].strip()
+
+                article = Article(title, author, time, body, section)
+                articles.append(article)
 
     path = os.path.join(dir_dumps, "cleaned.bin")
     print("Saved {} articles into {}".format(len(articles), path))
