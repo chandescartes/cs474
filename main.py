@@ -1,8 +1,10 @@
+
+import csv, pickle
 from utils import Corpus, Extractor, TopicModel
-import csv
 import os, sys
 
 if __name__ == '__main__':
+
     corpus = Corpus()
     hdp = corpus.hdp
     tm = TopicModel(corpus, hdp)
@@ -13,9 +15,6 @@ if __name__ == '__main__':
     #     for topic in topics:
     #         print(corpus.dict[topic[0]])
 
-
-
-
     # for idx, article in enumerate(corpus.articles):
     #     if idx >= 50:
     #         break
@@ -24,19 +23,6 @@ if __name__ == '__main__':
     #     print("Date: ", str(article.time))
     #     print("Body: ", article.body)
     #     print(article.text)
-
-
-    # print('total_number_of_words:', len(corpus.dict))
-    # print(corpus.dict)
-    # while True:
-    #     word = input(":")
-    #     try:
-    #         tmp = corpus.dict.token2id[word]
-    #         print(tmp)
-    #     except:
-    #         print("word not found!")
-
-
 
 
 # TODO
