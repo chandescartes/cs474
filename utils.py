@@ -35,7 +35,6 @@ class Article:
 class Corpus:
     def __init__(self, use_phraser=False, title_weight=5):
         self.use_phraser = use_phraser
-        self.use_title = use_title
         self.title_weight = title_weight
         self.name = "corpus.bin"
         if self.name in os.listdir(dir_dumps):
@@ -62,7 +61,7 @@ class Corpus:
             self.articles = pickle.load(f)
         for article in tqdm(self.articles):
             title = article.title_cleaned.split() * self.title_weight
-            article.text = ' '.join(article.section.split() + title + article.body_cleaned.split()) 
+            article.text = ' '.join(article.section.split() + title + article.body_cleaned.split())
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
