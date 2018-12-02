@@ -7,9 +7,6 @@ if __name__ == '__main__':
 
     corpus = Corpus()
     hdp = corpus.hdp
-<<<<<<< HEAD
-    print(hdp[corpus.articles[0].bow])   
-=======
     tm = TopicModel(corpus, hdp)
 
     # for i in range(10):
@@ -18,7 +15,6 @@ if __name__ == '__main__':
     #     for topic in topics:
     #         print(corpus.dict[topic[0]])
 
->>>>>>> 2c17ab46a5163cd7bcfc21129819e8b2aed38edb
     # for idx, article in enumerate(corpus.articles):
     #     if idx >= 50:
     #         break
