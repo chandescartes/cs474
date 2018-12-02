@@ -6,9 +6,12 @@ from tqdm import tqdm
 import csv
 # import matplotlib.pyplot as plt
 
-
+from nltk import word_tokenize, sent_tokenize, pos_tag, ne_chunk, ne_chunk_sents
+from nltk.corpus import stopwords, wordnet
+from nltk.tree import Tree
+from nltk.stem.wordnet import WordNetLemmatizer
 from gensim.parsing.preprocessing import *
-from gensim.models import TfidfModel
+from gensim.models import TfidfModel, HdpModel, LdaModel
 from gensim.corpora import Dictionary
 from gensim.models.phrases import Phrases, Phraser
 
@@ -65,15 +68,29 @@ class Corpus:
             self.phraser = None
         self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
-        print("building bows...")
+        print("building bag of words...")
         for article in tqdm(self.articles):
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
-        self.build_tfidf()
+        # self.build_tfidf()
+        self.build_hdp()
 
     def build_tfidf(self):
         print("building tf-idf model...")
-        self.tfidf = TfidfModel(self.get_bows(), dictionary=self.dict, smartirs='atn')
+        start = time.time()
+        self.tfidf = TfidfModel(corpus=self.get_bows(), dictionary=self.dict, smartirs='lpn')
+        end = time.time()
+        print("tfidf finished! ", end-start, " seconds")
+
+    def build_lda(self, num_topics):
+        pass
+
+    def build_hdp(self):
+        print("building hdp model...")
+        start = time.time()
+        self.hdp = HdpModel(corpus=self.get_bows(), id2word=self.dict)
+        end = time.time()
+        print("hdp finished! ", end-start, " seconds")
 
     def get_tfidf(self):
         return self.tfidf
@@ -155,10 +172,9 @@ class Dict:
         if self.name in os.listdir(dir_dumps):
             with open(dir_dumps+self.name, 'rb') as dic:
                 self.dict = pickle.load(dic)
-            print("keyword dictionary loaded")
+            print("dictionary loaded")
         else:
-            print("dictionary not exists")
-            print("start building...")
+            print("building dictionary...")
             self.build_dictionary()
             self.save()
 
