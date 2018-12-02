@@ -3,7 +3,7 @@ import csv
 import os, sys
 
 if __name__ == '__main__':
-    corpus = Corpus()
+    corpus = Corpus(use_title=True)
     hdp = corpus.hdp
     tm = TopicModel(corpus, hdp)
 
@@ -35,3 +35,13 @@ if __name__ == '__main__':
     #         print(tmp)
     #     except:
     #         print("word not found!")
+
+
+
+
+# TODO
+# options = {
+#     -c: build new clened.bin
+#     -p: use phrase
+#     -t: use title topic model
+# }

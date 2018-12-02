@@ -33,9 +33,13 @@ class Article:
         return self.__repr__()
 
 class Corpus:
-    def __init__(self, use_phraser=False):
+    def __init__(self, use_phraser=False, use_title=False):
         self.use_phraser = use_phraser
-        self.name = "corpus.bin"
+        self.use_title = use_title
+        if use_title:
+            self.name = "corpus_title.bin"
+        else:
+            self.name = "corpus.bin"
         if self.name in os.listdir(dir_dumps):
             print("loading corpus...")
             with open(dir_dumps+self.name, 'rb') as f:
@@ -59,7 +63,10 @@ class Corpus:
             print("collecting articles...")
             self.articles = pickle.load(f)
         for article in tqdm(self.articles):
-            article.text = ' '.join(article.section.split() + article.title_cleaned.split() + article.body_cleaned.split())
+            if self.use_title:
+                article.text = article.title_cleaned
+            else:
+                article.text = ' '.join(article.section.split() + article.title_cleaned.split() + article.body_cleaned.split())
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
@@ -165,8 +172,11 @@ class PhraserModel:
         print("saved!")
 
 class Dict:
-    def __init__(self, corpus, name="default", phraser=None):
-        self.name = "dictionary_" + name + ".bin"
+    def __init__(self, corpus, phraser=None):
+        if corpus.use_title:
+            self.name = "dictionary_title.bin"
+        else:
+            self.name = "dictionary.bin"
         self.corpus = corpus
         self.phraser = phraser
         if self.name in os.listdir(dir_dumps):
@@ -253,7 +263,10 @@ class Extractor:
 
 class TopicModel:
     def __init__(self, corpus, model):
-        self.name = "topic_model_collections.bin"
+        if corpus.use_title:
+            self.name = "topic_model_collections_title.bin"
+        else:
+            self.name = "topic_model_collections.bin"
         self.corpus = corpus
         self.model = model
 

@@ -1,6 +1,6 @@
 # Issue Tracker
 
-## CS474 Team #15
+## CS474 Team #4
 - Chanyoung Ryu
 - Sangwoo Hahn
 - JeongHo Ha
@@ -11,7 +11,7 @@ Python codes are written in version 3.6.5
 
 ```
 $ pip install -r requirements.txt
-$ python nltk.py
+$ python nltk_script.py
 ```
 **[Optional]**
 
@@ -37,14 +37,14 @@ Results are saved as result.csv
 - `dumps/` directory for dump files
 - `main.py` Main python source
 - `utils.py` Python implementation of text mining tools
-- `nltk.py` nltk download script
+- `nltk_script.py` nltk download script
 - `requirements.txt` python package dependencies
 
 
 ### Built With
 
-* [Gensim](https://radimrehurek.com/gensim/) - Topic Modelling Library for Python - [GitHub](https://github.com/RaRe-Technologies/gensim)
+* [Gensim](https://radimrehurek.com/gensim/) - Topic Modeling Library for Python - [GitHub](https://github.com/RaRe-Technologies/gensim)
 * [NLTK](https://www.nltk.org/) - Natural Language Toolkit - [GitHub](https://github.com/nltk/nltk)
 
 
-**Copyright (C) 2018 CS474 Team #16**
+**Copyright (C) 2018 CS474 Team #4**
