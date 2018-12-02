@@ -4,16 +4,17 @@ import os, sys
 
 if __name__ == '__main__':
     corpus = Corpus()
-    Extractor(corpus).extract()
-    for idx, article in enumerate(corpus.articles):
-        if idx >= 50:
-            break
-        print("Title: ", article.title)
-        print("Section: ", article.section)
-        print("Date: ", str(article.time))
-        print("Body: ", article.body)
-        print(article.text)
-        print(article.keywords)
+    hdp = corpus.hdp
+    print(hdp[corpus.articles[0].bow])   
+    # for idx, article in enumerate(corpus.articles):
+    #     if idx >= 50:
+    #         break
+    #     print("Title: ", article.title)
+    #     print("Section: ", article.section)
+    #     print("Date: ", str(article.time))
+    #     print("Body: ", article.body)
+    #     print(article.text)
+
 
     # print('total_number_of_words:', len(corpus.dict))
     # print(corpus.dict)
