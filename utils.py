@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import csv
+
+from multiprocessing import Pool
 # import matplotlib.pyplot as plt
 
 from gensim.parsing.preprocessing import *
@@ -310,7 +312,22 @@ class Window:
         self.end_date = start_date + delta # FIXME
         self.articles = [article for article in articles if article.date > self.start_date and sarticle.date < self.end_date]
 
-def clean_articles():
+
+def clean_df(df):
+    articles=[]
+    for i in tqdm(range(df.shape[0])):
+        title = df['title'][i].strip()
+        author = df[' author'][i].strip()
+        time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+        body = df[' body'][i].strip()
+        section = df[' section'][i].strip()
+
+        article = Article(title, author, time, body, section)
+        articles.append(article)
+
+    return articles
+
+def clean_articles(parallel=False):
     print("cleaning articles...")
     dfs = []
     for file in os.listdir("data"):
@@ -318,18 +335,25 @@ def clean_articles():
             with open(os.path.join("data", file), "r") as f:
                 dfs.append(pd.DataFrame.from_dict(json.load(f)))
 
-    articles = []
+    articles=[]
+    if parallel:
+        articleset = []
+        with Pool(len(dfs)) as p:
+            articleset = p.map(clean_df, dfs)
 
-    for df in dfs:
-        for i in tqdm(range(df.shape[0])):
-            title = df['title'][i].strip()
-            author = df[' author'][i].strip()
-            time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
-            body = df[' body'][i].strip()
-            section = df[' section'][i].strip()
+        for articlelist in articleset:
+            articles += articlelist
+    else:
+        for df in dfs:
+            for i in tqdm(range(df.shape[0])):
+                title = df['title'][i].strip()
+                author = df[' author'][i].strip()
+                time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+                body = df[' body'][i].strip()
+                section = df[' section'][i].strip()
 
-            article = Article(title, author, time, body, section)
-            articles.append(article)
+                article = Article(title, author, time, body, section)
+                articles.append(article)
 
     path = os.path.join(dir_dumps, "cleaned.bin")
     print("Saved {} articles into {}".format(len(articles), path))
@@ -368,7 +392,7 @@ def clean(text):
     chunks = ne_chunk(pos_tag(word_tokenize(text_stripped)))
     chunks = [p for p in chunks \
         if isinstance(p, Tree) \
-        or (p[1] in pos_to_wordnet 
+        or (p[1] in pos_to_wordnet
             and strip_non_alphanum(p[0]).strip()
             and p[0] not in stop_words
             and p[0][0] not in string.punctuation)]
