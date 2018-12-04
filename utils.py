@@ -7,7 +7,7 @@ import csv
 # import matplotlib.pyplot as plt
 
 from gensim.parsing.preprocessing import *
-from gensim.models import TfidfModel, HdpModel, LdaModel
+from gensim.models import TfidfModel, HdpModel, LdaModel, LdaSeqModel
 from gensim.corpora import Dictionary
 
 
@@ -59,6 +59,7 @@ class Corpus:
         with open(dir_dumps+"cleaned.bin", 'rb') as f:
             print("collecting articles...")
             self.articles = pickle.load(f)
+            self.articles.sort(key=lambda a: a.time)
         for article in tqdm(self.articles):
             title = article.title_cleaned.split() * self.title_weight
             article.text = ' '.join(article.section.split() + title + article.body_cleaned.split())
@@ -72,9 +73,12 @@ class Corpus:
         for article in tqdm(self.articles):
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
-        # self.build_tfidf()
+        self.build_tfidf()
+        self.extractor = Extractor(self)
+        self.extractor.extract()
+        self.build_lda()
+        self.build_ldaseq()
         self.build_hdp()
-        # self.build_lda()
 
     def build_tfidf(self):
         print("building tf-idf model...")
@@ -91,6 +95,28 @@ class Corpus:
         end = time.time()
         print("hdp finished! ", end-start, " seconds")
 
+    def build_ldaseq(self, num_topics=30):
+        corpus = self.get_bows()
+        print("building LDA model...")
+        start = time.time()
+
+        time_slice = []
+        time = datetime.date(2017,1,1)
+        time = time + datetime.timedelta(days=30)
+        cnt = 0
+        for article in self.articles:
+            if article.time < time.strftime("%Y-%m-%d %H:%M:%S"):
+                cnt += 1
+            else:
+                time_slice.append(cnt)
+                cnt = 1
+                time = time + datetime.timedelta(days=30)
+        time_slice.append(cnt)
+
+        self.ldaseq = LdaSeqModel(corpus=corpus, num_topics=num_topics, time_slice=time_slice, id2word=self.dict)
+        end = time.time()
+        print("hdp finished! ", end-start, " seconds")
+
     def build_hdp(self):
         print("building hdp model...")
         start = time.time()
@@ -98,8 +124,8 @@ class Corpus:
         end = time.time()
         print("hdp finished! ", end-start, " seconds")
 
-    def get_tfidf(self):
-        return self.tfidf
+    def get_keywords(self):
+        return [article.keywords for article in self.articles]
 
     def get_texts(self):
         return [article.text for article in self.articles]
@@ -205,7 +231,6 @@ class Extractor:
         self.corpus = corpus
         self.tfidf = corpus.tfidf
         self.dict = corpus.dict
-        self.phraser = corpus.phraser
         self.articles = corpus.articles
         self.bows = corpus.get_bows()
 
@@ -253,7 +278,6 @@ class Extractor:
 #
 #         print("train finished! ", end-start, " seconds")
 #
-#     # 저장
 #     def save(self):
 #         self.get_embedding.save(dir_embedding+self.name)
 #         print("saved!")
@@ -296,19 +320,12 @@ class TopicModel:
 
 
     def show_collections(self):
-        for idx, collection in enumerate(self.collections):
-            print(">>>",idx,"\tTOPIC: ",self.model.print_topic(idx))
-            for idx, article in enumerate(collection):
-                print("\t",idx,"\t",article.title)
-
-
-
-
-class Window:
-    def __init__(self, start_date, delta, articles):
-        self.start_date = start_date
-        self.end_date = start_date + delta # FIXME
-        self.articles = [article for article in articles if article.date > self.start_date and sarticle.date < self.end_date]
+        for i, collection in enumerate(self.collections):
+            print("ID: ",i,"\tN: ",len(collection),"\tTOPIC: ",self.model.print_topic(i))
+            for j, article in enumerate(collection):
+                if j >= 100:
+                    break
+                print("\t",j,"\t",article.title)
 
 def clean_articles():
     print("cleaning articles...")
@@ -368,7 +385,7 @@ def clean(text):
     chunks = ne_chunk(pos_tag(word_tokenize(text_stripped)))
     chunks = [p for p in chunks \
         if isinstance(p, Tree) \
-        or (p[1] in pos_to_wordnet 
+        or (p[1] in pos_to_wordnet
             and strip_non_alphanum(p[0]).strip()
             and p[0] not in stop_words
             and p[0][0] not in string.punctuation)]

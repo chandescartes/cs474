@@ -6,8 +6,9 @@ import os, sys
 if __name__ == '__main__':
 
     corpus = Corpus()
-    hdp = corpus.hdp
-    tm = TopicModel(corpus, hdp)
+    hdpm = TopicModel(corpus, corpus.hdp)
+    ldam = TopicModel(corpus, corpus.lda)
+    ldasm = TopicModel(corpus, corpus.ldaseq)
 
     # for i in range(10):
     #     print("TEXT: ",corpus.articles[i].text)
