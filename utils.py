@@ -97,9 +97,8 @@ class Corpus:
 
     def build_ldaseq(self, num_topics=30):
         corpus = self.get_bows()
-        print("building LDA model...")
-        start = time.time()
-
+        print("building LDAseq model...")
+        
         time_slice = []
         time = datetime.date(2017,1,1)
         time = time + datetime.timedelta(days=30)
@@ -118,7 +117,7 @@ class Corpus:
         print("hdp finished! ", end-start, " seconds")
 
     def build_hdp(self):
-        print("building hdp model...")
+        print("building HDP model...")
         start = time.time()
         self.hdp = HdpModel(corpus=self.get_bows(), id2word=self.dict)
         end = time.time()
