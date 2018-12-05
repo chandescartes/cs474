@@ -105,7 +105,7 @@ class Corpus:
         # self.build_tfidf()
         # self.extractor = Extractor(self)
         # self.extractor.extract()
-        self.build_lda(num_topics=50)
+        self.build_lda(num_topics=100)
         # self.save_model(self.lda)
         # self.build_ldaseq()
         # self.save_model(self.ldaseq)
@@ -371,9 +371,11 @@ class TopicModel:
 
 
     def show_collections(self):
-        for i, collection in enumerate(self.collections):
-            print("ID: ",i,"\tN: ",len(collection),"\tTOPIC: ",self.model.print_topic(i))
-            for j, article in enumerate(collection):
+        topics = list(self.topics.items())
+        topics.sort(key=lambda p:p[1],reverse=True)
+        for i, val in topics:
+            print("ID: ",i,"\tScore: ",val,"\tN: ",len(self.collections[i]),"\tTOPIC: ",self.model.print_topic(i))
+            for j, article in enumerate(self.collections[i]):
                 if j >= 100:
                     break
                 print("\t",j,"\t",article.title)
