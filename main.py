@@ -5,10 +5,19 @@ import os, sys
 
 if __name__ == '__main__':
 
-    corpus = Corpus()
-    hdpm = TopicModel(corpus, corpus.hdp)
-    ldam = TopicModel(corpus, corpus.lda)
-    ldasm = TopicModel(corpus, corpus.ldaseq)
+    corpus0 = Corpus(0)
+    ldam0 = TopicModel(corpus0, corpus0.lda)
+
+    corpus1 = Corpus(1)
+    ldam1 = TopicModel(corpus1, corpus1.lda)
+
+    corpus2 = Corpus(2)
+    ldam2 = TopicModel(corpus2, corpus2.lda)
+
+
+
+    # hdpm = TopicModel(corpus, corpus.hdp)
+    # ldasm = TopicModel(corpus, corpus.ldaseq)
 
     # for i in range(10):
     #     print("TEXT: ",corpus.articles[i].text)
