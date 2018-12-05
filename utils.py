@@ -7,7 +7,7 @@ import csv
 # import matplotlib.pyplot as plt
 
 from gensim.parsing.preprocessing import *
-from gensim.models import TfidfModel, HdpModel, LdaModel
+from gensim.models import TfidfModel, HdpModel, LdaModel, LdaSeqModel
 from gensim.corpora import Dictionary
 
 
@@ -33,19 +33,38 @@ class Article:
         return self.__repr__()
 
 class Corpus:
-    def __init__(self, use_phraser=False, title_weight=5):
+    def __init__(self, year, use_phraser=False, title_weight=5):
         self.use_phraser = use_phraser
         self.title_weight = title_weight
-        self.name = "corpus.bin"
+        self.name = "corpus_"+str(year)+".bin"
+        self.year = year
         if self.name in os.listdir(dir_dumps):
             print("loading corpus...")
             with open(dir_dumps+self.name, 'rb') as f:
                 c = pickle.load(f)
                 self.articles = c.articles
-                self.phraser = c.phraser
+                try:
+                    self.phraser = c.phraser
+                except:
+                    pass
                 self.dict = c.dict
-                self.tfidf = c.tfidf
-                self.hdp = c.hdp
+                try:
+                    self.tfidf = c.tfidf
+                except:
+                    pass
+                try:
+                    self.extractor = c.extractor
+                except:
+                    pass
+                try:
+                    self.hdp = c.hdp
+                except:
+                    pass
+                try:
+                    self.lda = c.lda
+                except:
+                    pass
+
             print("corpus loaded")
         else:
             self.build_corpus()
@@ -58,10 +77,21 @@ class Corpus:
             clean_articles()
         with open(dir_dumps+"cleaned.bin", 'rb') as f:
             print("collecting articles...")
-            self.articles = pickle.load(f)
-        for article in tqdm(self.articles):
-            title = article.title_cleaned.split() * self.title_weight
-            article.text = ' '.join(article.section.split() + title + article.body_cleaned.split())
+            articles = pickle.load(f)
+            articles.sort(key=lambda a: a.time)
+
+        start_time = datetime.datetime(2015+self.year,1,1,0,0,0)
+        end_time = datetime.datetime(2015+self.year+1,1,1,0,0,0)
+        self.articles = []
+        for article in tqdm(articles):
+            if article.time < start_time:
+                continue
+            elif article.time > end_time:
+                break
+            else:
+                title = article.title_cleaned.split() * self.title_weight
+                article.text = ' '.join(article.section.split() + title + article.body_cleaned.split())
+                self.articles.append(article)
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
@@ -73,39 +103,79 @@ class Corpus:
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
         # self.build_tfidf()
-        self.build_hdp()
-        # self.build_lda()
+        # self.extractor = Extractor(self)
+        # self.extractor.extract()
+        self.build_lda(num_topics=50)
+        # self.save_model(self.lda)
+        # self.build_ldaseq()
+        # self.save_model(self.ldaseq)
+        # self.build_hdp()
+        # self.save_model(self.hdp)
+
+        # for i in range(20,201, 10):
+        #     print("Number of topics: ",i)
+        #     self.build_lda(num_topics=i)
+        #     self.save_model(self.lda)
+
+
 
     def build_tfidf(self):
-        print("building tf-idf model...")
+        print("building tf-idf model... usually takes around 30 seconds")
         start = time.time()
         self.tfidf = TfidfModel(corpus=self.get_bows(), dictionary=self.dict, smartirs='lpn')
         end = time.time()
         print("tfidf finished! ", end-start, " seconds")
 
-    def build_lda(self, num_topics=30):
+    def build_lda(self, num_topics=50):
         corpus = self.get_bows()
         print("building LDA model...")
         start = time.time()
         self.lda = LdaModel(corpus=corpus, num_topics=num_topics, id2word=self.dict)
         end = time.time()
-        print("hdp finished! ", end-start, " seconds")
+        print("LDA finished! ", end-start, " seconds")
+
+    def build_ldaseq(self, num_topics=30):
+        corpus = self.get_bows()
+        print("building LDAseq model... this may take a while")
+
+        time_slice = []
+        time = datetime.datetime(2015,1,1,0,0,0)
+        time = time + datetime.timedelta(days=30)
+        cnt = 0
+        for article in self.articles:
+            if article.time < time:
+                cnt += 1
+            else:
+                time_slice.append(cnt)
+                cnt = 1
+                time = time + datetime.timedelta(days=30)
+        time_slice.append(cnt)
+
+        self.ldaseq = LdaSeqModel(corpus=corpus, num_topics=num_topics, time_slice=time_slice, id2word=self.dict)
+        end = time.time()
+        print("LDAseq finished! ", end-start, " seconds")
 
     def build_hdp(self):
-        print("building hdp model...")
+        print("building HDP model...")
         start = time.time()
         self.hdp = HdpModel(corpus=self.get_bows(), id2word=self.dict)
         end = time.time()
-        print("hdp finished! ", end-start, " seconds")
+        print("HDP finished! ", end-start, " seconds")
 
-    def get_tfidf(self):
-        return self.tfidf
+    def get_keywords(self):
+        return [article.keywords for article in self.articles]
 
     def get_texts(self):
         return [article.text for article in self.articles]
 
     def get_bows(self):
         return [article.bow for article in self.articles]
+
+    def save_model(self, model):
+        num_topics = model.get_topics().shape[0]
+        with open(dir_dumps+model.__class__.__name__+"_"+str(num_topics)+".bin", "wb") as f:
+            pickle.dump(self, f)
+        print("model saved")
 
     def save(self):
         with open(dir_dumps+self.name, "wb") as f:
@@ -184,7 +254,7 @@ class Dict:
         else:
             print("building dictionary...")
             self.build_dictionary()
-            self.save()
+            # self.save()
 
     def build_dictionary(self):
         self.dict = Dictionary()
@@ -205,7 +275,6 @@ class Extractor:
         self.corpus = corpus
         self.tfidf = corpus.tfidf
         self.dict = corpus.dict
-        self.phraser = corpus.phraser
         self.articles = corpus.articles
         self.bows = corpus.get_bows()
 
@@ -253,7 +322,6 @@ class Extractor:
 #
 #         print("train finished! ", end-start, " seconds")
 #
-#     # 저장
 #     def save(self):
 #         self.get_embedding.save(dir_embedding+self.name)
 #         print("saved!")
@@ -261,30 +329,37 @@ class Extractor:
 
 class TopicModel:
     def __init__(self, corpus, model):
-        self.name = "topic_model_collections.bin"
+        self.name = model.__class__.__name__+"_collections.bin"
         self.corpus = corpus
         self.model = model
 
-        if self.name in os.listdir(dir_dumps):
-            print("loading collections...")
-            with open(dir_dumps + self.name, "rb") as p:
-                print(self.name, " loaded")
-                self.collections = pickle.load(p)
+        self.build_collections()
 
-        else:
-            self.build_collections()
-            self.save_collections()
+        # if self.name in os.listdir(dir_dumps):
+        #     print("loading collections...")
+        #     with open(dir_dumps + self.name, "rb") as p:
+        #         print(self.name, " loaded")
+        #         self.collections = pickle.load(p)
+        #
+        # else:
+        #     self.build_collections()
+        #     self.save_collections()
 
 
     def build_collections(self):
         print("building collections...")
-        self.collections = [[] for i in range(self.model.get_topics().shape[0])]
-
+        self.num_topics = self.model.get_topics().shape[0]
+        self.collections = [[] for i in range(self.num_topics)]
+        self.topics = {}
+        for i in range(self.num_topics):
+            self.topics[i] = 0
         articles = self.corpus.articles
 
         for article in tqdm(articles):
             vector = self.model[article.bow]
             vector.sort(key=lambda p : p[1], reverse=True)
+            for e in vector:
+                self.topics[e[0]] += e[1]
             article.topic = vector[0]
             self.collections[article.topic[0]].append(article)
 
@@ -296,19 +371,18 @@ class TopicModel:
 
 
     def show_collections(self):
-        for idx, collection in enumerate(self.collections):
-            print(">>>",idx,"\tTOPIC: ",self.model.print_topic(idx))
-            for idx, article in enumerate(collection):
-                print("\t",idx,"\t",article.title)
+        for i, collection in enumerate(self.collections):
+            print("ID: ",i,"\tN: ",len(collection),"\tTOPIC: ",self.model.print_topic(i))
+            for j, article in enumerate(collection):
+                if j >= 100:
+                    break
+                print("\t",j,"\t",article.title)
 
-
-
-
-class Window:
-    def __init__(self, start_date, delta, articles):
-        self.start_date = start_date
-        self.end_date = start_date + delta # FIXME
-        self.articles = [article for article in articles if article.date > self.start_date and sarticle.date < self.end_date]
+    def show_topics(self):
+        topics = list(self.topics.items())
+        topics.sort(key=lambda p:p[1],reverse=True)
+        for i, val in topics:
+            print("ID: ",i,"\tScore: ",val,"\tN: ",len(self.collections[i]),"\tTOPIC: ",self.model.print_topic(i))
 
 def clean_articles():
     print("cleaning articles...")
@@ -368,7 +442,7 @@ def clean(text):
     chunks = ne_chunk(pos_tag(word_tokenize(text_stripped)))
     chunks = [p for p in chunks \
         if isinstance(p, Tree) \
-        or (p[1] in pos_to_wordnet 
+        or (p[1] in pos_to_wordnet
             and strip_non_alphanum(p[0]).strip()
             and p[0] not in stop_words
             and p[0][0] not in string.punctuation)]
@@ -408,3 +482,9 @@ def tokenizer(texts, phraser=None):
         else:
             continue
     return tokenized
+
+def load_model(filename):
+    with open(dir_dumps+filename, 'rb') as f:
+        print("lodaing model...")
+        model = pickle.load(f)
+        return model
