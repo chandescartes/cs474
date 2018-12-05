@@ -93,18 +93,18 @@ class Corpus:
         start = time.time()
         self.lda = LdaModel(corpus=corpus, num_topics=num_topics, id2word=self.dict)
         end = time.time()
-        print("hdp finished! ", end-start, " seconds")
+        print("LDA finished! ", end-start, " seconds")
 
     def build_ldaseq(self, num_topics=30):
         corpus = self.get_bows()
         print("building LDAseq model...")
-        
+
         time_slice = []
-        time = datetime.date(2017,1,1)
+        time = datetime.datetime(2017,1,1,0,0,0)
         time = time + datetime.timedelta(days=30)
         cnt = 0
         for article in self.articles:
-            if article.time < time.strftime("%Y-%m-%d %H:%M:%S"):
+            if article.time < time:
                 cnt += 1
             else:
                 time_slice.append(cnt)
@@ -114,14 +114,14 @@ class Corpus:
 
         self.ldaseq = LdaSeqModel(corpus=corpus, num_topics=num_topics, time_slice=time_slice, id2word=self.dict)
         end = time.time()
-        print("hdp finished! ", end-start, " seconds")
+        print("LDAseq finished! ", end-start, " seconds")
 
     def build_hdp(self):
         print("building HDP model...")
         start = time.time()
         self.hdp = HdpModel(corpus=self.get_bows(), id2word=self.dict)
         end = time.time()
-        print("hdp finished! ", end-start, " seconds")
+        print("HDP finished! ", end-start, " seconds")
 
     def get_keywords(self):
         return [article.keywords for article in self.articles]
