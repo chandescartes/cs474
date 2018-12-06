@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import csv
+
+from multiprocessing import Pool
 # import matplotlib.pyplot as plt
 
 from gensim.parsing.preprocessing import *
@@ -384,7 +386,22 @@ class TopicModel:
         for i, val in topics:
             print("ID: ",i,"\tScore: ",val,"\tN: ",len(self.collections[i]),"\tTOPIC: ",self.model.print_topic(i))
 
-def clean_articles():
+
+def clean_df(df):
+    articles=[]
+    for i in tqdm(range(df.shape[0])):
+        title = df['title'][i].strip()
+        author = df[' author'][i].strip()
+        time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+        body = df[' body'][i].strip()
+        section = df[' section'][i].strip()
+
+        article = Article(title, author, time, body, section)
+        articles.append(article)
+
+    return articles
+
+def clean_articles(parallel=False):
     print("cleaning articles...")
     dfs = []
     for file in os.listdir("data"):
@@ -392,18 +409,25 @@ def clean_articles():
             with open(os.path.join("data", file), "r") as f:
                 dfs.append(pd.DataFrame.from_dict(json.load(f)))
 
-    articles = []
+    articles=[]
+    if parallel:
+        articleset = []
+        with Pool(len(dfs)) as p:
+            articleset = p.map(clean_df, dfs)
 
-    for df in dfs:
-        for i in tqdm(range(df.shape[0])):
-            title = df['title'][i].strip()
-            author = df[' author'][i].strip()
-            time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
-            body = df[' body'][i].strip()
-            section = df[' section'][i].strip()
+        for articlelist in articleset:
+            articles += articlelist
+    else:
+        for df in dfs:
+            for i in tqdm(range(df.shape[0])):
+                title = df['title'][i].strip()
+                author = df[' author'][i].strip()
+                time = datetime.datetime.strptime(df[' time'][i].strip(), "%Y-%m-%d %H:%M:%S")
+                body = df[' body'][i].strip()
+                section = df[' section'][i].strip()
 
-            article = Article(title, author, time, body, section)
-            articles.append(article)
+                article = Article(title, author, time, body, section)
+                articles.append(article)
 
     path = os.path.join(dir_dumps, "cleaned.bin")
     print("Saved {} articles into {}".format(len(articles), path))
