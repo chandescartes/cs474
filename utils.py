@@ -34,6 +34,14 @@ class Article:
     def __str__(self):
         return self.__repr__()
 
+    def set_entities(self, entities):
+        # List of maps. Keys: text, relevance, count
+        self.entities = entities
+
+    def set_keywords(self, keywords):
+        # List of maps. Keys: type, text, relevance, disambiguation
+        self.keywords = keywords
+
 class Corpus:
     def __init__(self, year, use_phraser=False, title_weight=5):
         self.use_phraser = use_phraser
