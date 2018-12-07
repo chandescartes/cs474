@@ -7,12 +7,15 @@ if __name__ == '__main__':
 
     corpus0 = Corpus(0)
     ldam0 = TopicModel(corpus0, corpus0.lda)
+    hdpm0 = TopicModel(corpus0, corpus0.hdp)
 
     corpus1 = Corpus(1)
     ldam1 = TopicModel(corpus1, corpus1.lda)
+    hdpm1 = TopicModel(corpus1, corpus1.hdp)
 
     corpus2 = Corpus(2)
     ldam2 = TopicModel(corpus2, corpus2.lda)
+    hdpm2 = TopicModel(corpus2, corpus2.hdp)
 
 
 
