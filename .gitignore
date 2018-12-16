@@ -4,3 +4,5 @@ venv/
 data/READ.ME
 .tags
 dumps/
+API_document.txt
+results.txt

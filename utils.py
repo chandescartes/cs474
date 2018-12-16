@@ -1,3 +1,17 @@
+"""Utility file containing classes and general functions.
+
+Classes:
+ - Article
+ - Corpus
+ - Issue
+ - PhraserModel
+ - Dict
+ - Extractor
+ - IssueModel
+ - EventModel
+"""
+
+
 import os, sys, datetime, time
 import json, pickle
 import pandas as pd
@@ -17,7 +31,16 @@ dir_dumps = "dumps/"
 dir_data = "data/"
 
 class Article:
+    """An article class.
+    """
+
     def __init__(self, title, author, time, body, section):
+        """Initializes an article
+
+        Arguments are self-explanatory from their names.
+        *_cleaned keeps the corresponding text after applying preprocessing.
+        """
+
         self.title = title
         self.author = author
         self.time = time
@@ -34,19 +57,37 @@ class Article:
         return self.__repr__()
 
     def set_entities(self, entities):
-        # List of maps. Keys: text, relevance, count
+        """Set the entities for an article.
+
+        self.entities: List of maps with
+        keys = (text, relevance), values = count
+        """
         self.entities = entities
 
     def set_keywords(self, keywords):
-        # List of maps. Keys: type, text, relevance, disambiguation
+        """Set the keywords for an article.
+
+        Keywords are not used.
+        """
         self.keywords = keywords
 
 class Corpus:
+    """A corpus class.
+
+    A corpus is defined for each year.
+    """
+
     def __init__(self, year, use_phraser=True, title_weight=5):
+        """Initializes a corpus.
+
+        use_phraser indicates whether to use phrasing (n-gram based).
+        title_weight is the number of times a title is inserted to the text.
+        """
+
         self.use_phraser = use_phraser
         self.title_weight = title_weight
         self.year = year
-        
+
     def build_corpus(self):
         print("building corpus...")
         with open(dir_dumps+"cleaned_watson.bin", 'rb') as f:
@@ -56,7 +97,7 @@ class Corpus:
 
         start_time = datetime.datetime(2015+self.year,1,1,0,0,0)
         end_time = datetime.datetime(2015+self.year+1,1,1,0,0,0)
-        
+
         self.articles = []
         for article in articles:
             if article.time < start_time:
@@ -67,22 +108,25 @@ class Corpus:
                 title = article.title_cleaned.split() * self.title_weight
                 article.text = ' '.join(article.section.split() + title + article.body_cleaned.split())
                 self.articles.append(article)
-                
+
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
             self.phraser = None
-            
+
         self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
         print("building bag of words...")
         time.sleep(1)
-        
+
         for article in tqdm(self.articles):
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
 
     def build_tfidf(self):
+        """Builds a tf-idf model of the corpus.
+        """
+
         print("building tf-idf model...")
         start = time.time()
         self.tfidf = TfidfModel(corpus=self.get_bows(), dictionary=self.dict, smartirs='lpn')
@@ -90,6 +134,11 @@ class Corpus:
         print("tfidf finished! {:.2f} seconds".format(end-start))
 
     def build_lda(self, num_topics=100):
+        """Builds an LDA model of the corpus.
+
+        num_topics is a parameter for LDA.
+        """
+
         corpus = self.get_bows()
         print("building LDA model...")
         start = time.time()
@@ -98,6 +147,11 @@ class Corpus:
         print("LDA finished! {:.2f} seconds".format(end-start))
 
     def build_lsi(self, num_topics=100):
+        """Builds an LSI model of the corpus.
+
+        num_topics is a parameter for LSI.
+        """
+
         corpus = self.get_bows()
         print("building LSI model...")
         start = time.time()
@@ -106,6 +160,9 @@ class Corpus:
         print("LSI finished! {:.2f} seconds".format(end-start))
 
     def build_hdp(self):
+        """Builds an HDP model of the corpus.
+        """
+
         print("building HDP model...")
         start = time.time()
         self.hdp = HdpModel(corpus=self.get_bows(), id2word=self.dict)
@@ -113,38 +170,63 @@ class Corpus:
         print("HDP finished! {:.2f} seconds".format(end-start))
 
     def get_keywords(self):
+        """Returns a list of all keywords in the corpus.
+        """
+
         return [article.keywords for article in self.articles]
 
     def get_texts(self):
+        """Returns a list of all texts in the corpus.
+        """
+
         return [article.text for article in self.articles]
 
     def get_bows(self):
+        """Returns a list of all bag of words in the corpus.
+        """
+
         return [article.bow for article in self.articles]
 
 
 class Issue:
+    """An issue class.
+    """
+
     def __init__(self, articles, keywords, use_phraser=True):
+        """Initializes the issue.
+        """
+
         self.articles = articles
         self.use_phraser = use_phraser
         self.keywords = keywords
 
     def build_issue(self):
+        """Builds components of the issue.
+
+        Groups common phrases,
+        builds a dictionary,
+        and creates a bag of words for each article.
+        """
+
         print("building issue...")
-        
+
         if self.use_phraser:
             self.phraser = PhraserModel(corpus=self, name="tri").get_phraser()
         else:
             self.phraser = None
-            
+
         self.dict = Dict(corpus=self, phraser=self.phraser).get_dict()
 
         print("building bag of words...")
         time.sleep(1)
-        
+
         for article in tqdm(self.articles):
             article.bow = self.dict.doc2bow(tokenizer([article.text], phraser=self.phraser)[0])
 
     def build_tfidf(self):
+        """Builds a tf-idf model of the issue.
+        """
+
         print("building tf-idf model...")
         start = time.time()
         self.tfidf = TfidfModel(corpus=self.get_bows(), dictionary=self.dict, smartirs='lpn')
@@ -152,6 +234,11 @@ class Issue:
         print("tfidf finished! {:.2f} seconds".format(end-start))
 
     def build_lda(self, num_topics=100):
+        """Builds an LDA model of the issue.
+
+        num_topics is a parameter for LDA.
+        """
+
         corpus = self.get_bows()
         print("building LDA model...")
         start = time.time()
@@ -160,6 +247,11 @@ class Issue:
         print("LDA finished! {:.2f} seconds".format(end-start))
 
     def build_lsi(self, num_topics=100):
+        """Builds an LSI model of the issue.
+
+        num_topics is a parameter for LSI.
+        """
+
         corpus = self.get_bows()
         print("building LSI model...")
         start = time.time()
@@ -167,26 +259,44 @@ class Issue:
         end = time.time()
         print("LSI finished! {:.2f} seconds".format(end-start))
 
-    
+
     def get_keywords(self):
+        """Returns a list of all keywords in the issue.
+        """
+
         return [article.keywords for article in self.articles]
 
     def get_texts(self):
+        """Returns a list of all texts in the issue.
+        """
+
         return [article.text for article in self.articles]
 
     def get_bows(self):
+        """Returns a list of all bag of words in the issue.
+        """
+
         return [article.bow for article in self.articles]
 
-     
+
 class PhraserModel:
+    """A Phraser model
+    """
+
     def __init__(self, corpus, name="tri"):
+        """Initializes a phraser model.
+        """
+
         self.corpus = corpus
         print("building phrasers...")
         self.build_bigram_phraser()
         self.bi_phraser = self.phraser
         self.build_trigram_phraser()
-        
+
     def build_bigram_phraser(self):
+        """Builds common bi-grams.
+        """
+
         from gensim.models.phrases import Phrases, Phraser
         texts = self.corpus.get_texts()
         tokens = []
@@ -197,6 +307,9 @@ class PhraserModel:
         print("bigram train finished! {:.2f} seconds".format(end-start))
 
     def build_trigram_phraser(self):
+        """Builds common tri-grams.
+        """
+
         from gensim.models.phrases import Phrases, Phraser
         texts = self.corpus.get_texts()
         tokens = []
@@ -211,12 +324,21 @@ class PhraserModel:
 
 
 class Dict:
+    """A dictionary class.
+    """
+
     def __init__(self, corpus, phraser=None):
+        """Initializes a dictionary.
+        """
+
         self.corpus = corpus
         self.phraser = phraser
         self.build_dictionary()
 
     def build_dictionary(self):
+        """Builds a dictionary over the corpus.
+        """
+
         print("building dictionary...")
         self.dict = Dictionary()
         texts = self.corpus.get_texts()
@@ -226,7 +348,17 @@ class Dict:
         return self.dict
 
 class Extractor:
+    """An extractor class.
+
+    Extracts keywords for a given corpus using tf-idf.
+    """
+
     def __init__(self, corpus):
+        """Initializes the extractor.
+
+        Argument names are self-explanatory.
+        """
+
         self.corpus = corpus
         self.tfidf = corpus.tfidf
         self.dict = corpus.dict
@@ -234,6 +366,9 @@ class Extractor:
         self.bows = corpus.get_bows()
 
     def extract(self, k=10):
+        """Extracts k top keywords.
+        """
+
         print("extracting keywords...")
         time.sleep(1)
         for article in tqdm(self.articles):
@@ -251,28 +386,33 @@ class Extractor:
             article.tfidf_keywords = keywords[:k]
 
 class IssueModel:
+    """A IssueModel class.
+    carries corpus (list of articles) and the topic model
+    """
+
     def __init__(self, corpus, model):
+        """Initializes a collection for a given corpus.
+        """
+
         self.corpus = corpus
         self.model = model
 
     def build_issues(self, threshold=0.5):
+        """Builds issue clusters.
+        """
+
         print("building issues...")
         time.sleep(1)
         self.num_issues = self.model.get_topics().shape[0]
         self.issues = [[] for i in range(self.num_issues)]
         self.issue_scores = {}
-        
+
 
         for i in range(self.num_issues):
             self.issue_scores[i] = 0
-            
+
         articles = self.corpus.articles
-        
-        # issue_sums = [0] * self.num_issues
-        # for article in articles:
-        #     vector = self.model[article.bow]
-        #     for e in vector:
-        #         issue_sums[e[0]] += abs(e[1])
+
 
         for article in tqdm(articles):
             vector = self.model[article.bow]
@@ -283,29 +423,21 @@ class IssueModel:
                 article.issue_scores[e[0]] = sqrt(e[1]) # FIXME
             if vector[0][1] > threshold:
                 self.issues[vector[0][0]].append(article)
-            
-                    
 
-            # norm_vector = []
-            # for e in vector:
-            #     norm_vector.append((e[0],e[1] / sqrt(issue_sums[e[0]])))
-            # norm_vector.sort(key=lambda p : p[1], reverse=True)
-            # article.issue_scores = {}
-            # for e in norm_vector:
-            #     self.issue_scores[e[0]] += e[1]
-            # self.issues[norm_vector[0][0]].append(article)
-            # article.issue_scores[norm_vector[0][0]] = norm_vector[0][1]
-            
-                    
+
+
         self.sorted_issues = list(self.issue_scores.items())
         self.sorted_issues.sort(key=lambda p:p[1],reverse=True)
-        
+
 
         # self.build_summaries()
         self.extract_keywords()
 
 
     def build_summaries(self):
+        """Builds summaries
+        """
+
         self.summaries = []
         print("summarizing collections...")
         time.sleep(1)
@@ -322,6 +454,9 @@ class IssueModel:
             self.summaries.append(summary)
 
     def extract_keywords(self):
+        """Extracts keywords of collections
+        """
+
         self.keywords = []
         print("extracting keywords...")
         time.sleep(1)
@@ -330,16 +465,19 @@ class IssueModel:
             for article in self.issues[i]:
                 for keyword in article.tfidf_keywords:
                     if keyword[1] not in dic:
-                        dic[keyword[1]] = article.issue_scores[i] 
+                        dic[keyword[1]] = article.issue_scores[i]
                         # dic[keyword[1]] = keyword[0]
                     else:
-                        dic[keyword[1]] += article.issue_scores[i] 
+                        dic[keyword[1]] += article.issue_scores[i]
                         # dic[keyword[1]] += keyword[0]
             sorted_dic = list(dic.items())
             sorted_dic.sort(key=lambda p:p[1],reverse=True)
             self.keywords.append(sorted_dic[:10])
 
     def show_issues(self, topn=10, k=20):
+        """Prints top issues and sample article titles in the issue cluster
+        """
+
         cnt = 0
         for i, val in self.sorted_issues:
             if cnt >= topn:
@@ -352,6 +490,9 @@ class IssueModel:
             cnt += 1
 
     def show_issue_names(self, topn=10):
+        """Prints top issues with topic names given by topic model.
+        """
+
         cnt = 0
         for i, val in self.sorted_issues:
             if cnt >= topn:
@@ -359,6 +500,9 @@ class IssueModel:
             print("ID: {:3d} Score: {:6.2f} N: {:4d} Topic: ".format(i, val, len(self.issues[i])), self.model.print_topic(i))
             cnt += 1
     def show_top_issues(self, topn=10):
+        """Prints top issues with thier trend metric, number of articles, and keywords.
+        """
+
         cnt = 0
         for i, val in self.sorted_issues:
             if cnt >= topn:
@@ -367,21 +511,30 @@ class IssueModel:
             cnt += 1
 
 class EventModel:
+    """A IssueModel class.
+    carries issue (Issue object) and the topic model
+    """
+
     def __init__(self, issue, model):
         self.issue = issue
         self.model = model
 
     def build_events(self, threshold=0.5):
+        """Builds event clusters.
+
+        Calculates dependencies between events.
+        """
+
         print("building events...")
         time.sleep(1)
         self.num_events = self.model.get_topics().shape[0]
         self.events = [[] for i in range(self.num_events)]
         self.event_scores = {}
-        
-        
+
+
         dependency = np.zeros((self.num_events, self.num_events))
         self.union_cnt = np.zeros((self.num_events, self.num_events))
-        
+
         for i in range(self.num_events):
             self.event_scores[i] = 0
         articles = self.issue.articles
@@ -395,17 +548,17 @@ class EventModel:
                 self.event_scores[e[0]] += sqrt(e[1])
                 article.event_scores[e[0]] = sqrt(e[1])
             if vector[0][1] > threshold:
-                self.events[vector[0][0]].append(article)            
-            
+                self.events[vector[0][0]].append(article)
+
             for pair in combinations(vector, r=2):
-                dependency[pair[0][0]][pair[1][0]] += sqrt(pair[0][1])*sqrt(pair[1][1])
-                dependency[pair[1][0]][pair[0][0]] += sqrt(pair[0][1])*sqrt(pair[1][1])
+                dependency[pair[0][0]][pair[1][0]] += pair[0][1]*pair[1][1]
+                dependency[pair[1][0]][pair[0][0]] += pair[0][1]*pair[1][1]
                 self.union_cnt[pair[0][0]][pair[1][0]] += 1
                 self.union_cnt[pair[1][0]][pair[0][0]] += 1
-                    
+
         self.sorted_events = list(self.event_scores.items())
         self.sorted_events.sort(key=lambda p:p[1],reverse=True)
-        
+
 
         self.dependency = np.divide(dependency, self.union_cnt)
         np.nan_to_num(self.dependency, copy=False)
@@ -414,6 +567,9 @@ class EventModel:
         self.extract_keywords()
 
     def build_summaries(self):
+        """Builds summaries
+        """
+
         self.summaries = []
         print("summarizing collections...")
         time.sleep(1)
@@ -430,6 +586,9 @@ class EventModel:
             self.summaries.append(summary)
 
     def extract_keywords(self):
+        """Extracts keywords of collections
+        """
+
         self.keywords = []
         print("extracting keywords...")
         time.sleep(1)
@@ -448,6 +607,9 @@ class EventModel:
             self.keywords.append(sorted_dic[:10])
 
     def show_events(self, topn=10, k=20):
+        """Prints top events and sample article titles in the event cluster.
+        """
+
         cnt = 0
         for i, val in self.sorted_events:
             if cnt >= topn:
@@ -460,6 +622,9 @@ class EventModel:
             cnt += 1
 
     def show_event_names(self, topn=10):
+        """Prints top events with topic names given by topic model.
+        """
+
         cnt = 0
         for i, val in self.sorted_events:
             if cnt >= topn:
@@ -467,6 +632,9 @@ class EventModel:
             print("ID: {:3d} Score: {:6.2f} N: {:4d} Topic: ".format(i, val, len(self.events[i])), self.model.print_topic(i))
             cnt += 1
     def show_top_events(self, topn=10):
+        """Prints top issues with their trend metric, number of articles, and keywords.
+        """
+
         cnt = 0
         for i, val in self.sorted_events:
             if cnt >= topn:
@@ -475,6 +643,9 @@ class EventModel:
             cnt += 1
 
     def build_independents(self, threshold=0.5):
+        """Build independent components
+        """
+
         matrix = self.dependency
         graph = {node: set(i for i, x in enumerate(matrix[node]) if x > threshold)
             for node in range(len(matrix))}
@@ -488,6 +659,8 @@ class EventModel:
         self.independents = components
 
     def filter_events(self, k=20):
+        """Filter out non important events from independents
+        """
         top_events = [topic[0] for topic in self.sorted_events[:k]]
         self.filtered_independents = []
         for independent in self.independents:
@@ -496,16 +669,19 @@ class EventModel:
                 if event in top_events:
                     filtered_independent.append(event)
             if len(filtered_independent) > 0:
-                self.filtered_independents.append(filtered_independent) 
+                self.filtered_independents.append(filtered_independent)
 
     def build_event_times(self):
+        """Calculate event times
+        """
+
         self.event_times = {}
         print("building event times...")
         time.sleep(1)
         event_ids = []
         for independent in self.filtered_independents:
             event_ids += independent
-            
+
         for event_id in tqdm(event_ids):
             time_sum = 0
             weight_sum = 0
@@ -516,19 +692,25 @@ class EventModel:
             self.event_times[event_id] = avg_time
 
     def build_sorted_independents(self):
+        """Sort independents by event time
+        """
+
         self.sorted_independents = []
         for independent in self.filtered_independents:
             independent.sort(key=lambda event_id:self.event_times[event_id])
             self.sorted_independents.append(independent)
 
     def build_event_details(self):
+        """Build event details
+        """
+
         self.event_details = {}
         print("building event details...")
         time.sleep(1)
         event_ids = []
         for independent in self.sorted_independents:
             event_ids += independent
-            
+
         for event_id in tqdm(event_ids):
             event_detail = {}
             event_detail['time'] = datetime.datetime.utcfromtimestamp(self.event_times[event_id])
@@ -537,10 +719,16 @@ class EventModel:
             self.event_details[event_id] = event_detail
 
     def show_independents(self):
+        """Print independents
+        """
+
         for independent in self.sorted_independents:
             print("\t"," -> ".join([str(event_id) for event_id in independent]))
 
     def show_event_details(self, event_id, num_entities):
+        """Print event details
+        """
+
         event_detail = self.event_details[event_id]
         print("Event ID: {:3d}".format(event_id))
         print("Event Keywords: ")
@@ -551,6 +739,9 @@ class EventModel:
             print("\t{}, {}".format(entity[0], entity[1].upper()))
 
     def show_issue_summary(self, num_entities):
+        """Print issue summary
+        """
+
         print("Issue Keywords: ")
         print("\t",', '.join([keyword[0] for keyword in self.issue.keywords]))
         print("")
@@ -566,6 +757,9 @@ class EventModel:
             self.show_event_details(event_id, num_entities=num_entities)
 
     def get_top_entities(self, event_id):
+        """get top named entities from event
+        """
+
         articles = self.events[event_id]
         invalid_types = set(["EmailAddress"])
         blacklist = set(["Yonhap"])
@@ -583,12 +777,17 @@ class EventModel:
                     dict_entities[key] += sqrt(article.event_scores[event_id])
                 else:
                     dict_entities[key] =  sqrt(article.event_scores[event_id])
-        
+
         entities = [(k[0], k[1], v) for k, v in dict_entities.items()]
         entities.sort(key=lambda t: t[2], reverse=True)
         return entities
 
 def clean_articles():
+    """Cleans the given data (JSON files).
+
+    Saves them to a single binary file, cleaned.bin.
+    """
+
     print("cleaning articles...")
     dfs = []
     for file in os.listdir("data"):
@@ -614,6 +813,9 @@ def clean_articles():
     pickle.dump(articles, open(path, "wb+"))
 
 def call_watson(chunk, return_dict, index, nlu):
+    """Call watson apis to collect named entities for every article
+    """
+
     for article in tqdm(chunk):
         for i in range(3):
             try:
@@ -636,6 +838,9 @@ def call_watson(chunk, return_dict, index, nlu):
     return_dict[index] = chunk
 
 def build_watson():
+    """multiprocessing for call_watson
+    """
+
     nlu = NaturalLanguageUnderstandingV1(
         version='2018-03-16',
         username='edd1f2ac-7ee6-43b9-bb78-b4f67a887df3',
@@ -669,6 +874,11 @@ def build_watson():
     return articles
 
 def clean(text):
+    """Cleans given text.
+
+    Preprocessing details are in the report.
+    """
+
     from nltk import word_tokenize, sent_tokenize, pos_tag, ne_chunk, ne_chunk_sents
     from nltk.corpus import stopwords, wordnet
     from nltk.tree import Tree
@@ -731,6 +941,9 @@ def clean(text):
     return " ".join(cleaned)
 
 def tokenizer(texts, phraser=None):
+    """Tokenizes the text to words.
+    """
+
     tokenized = []
     for text in texts:
         if type(text) is str:
@@ -743,6 +956,11 @@ def tokenizer(texts, phraser=None):
     return tokenized
 
 def connected_components(neighbors):
+    """Returns connected components given a set of neighbors.
+
+    A general algorithm for finding connected components.
+    """
+
     seen = set()
     def component(node):
         nodes = set([node])
@@ -756,6 +974,11 @@ def connected_components(neighbors):
             yield component(node)
 
 def get_independents(matrix, threshold= 0.5):
+    """Returns independent components.
+
+    Components are independent if their dependency score is below threshold.
+    """
+
     graph = {node: set(i for i, x in enumerate(matrix[node]) if x > threshold)
         for node in range(len(matrix))}
     components = []
@@ -771,12 +994,18 @@ def get_independents(matrix, threshold= 0.5):
 
 
 def save(obj, filename):
+    """Saves a Python object to a binary file.
+    """
+
     with open(dir_dumps+filename, "wb") as f:
         print("saving "+filename+"...")
         pickle.dump(obj, f)
         print(filename+" saved")
 
 def load(filename):
+    """Loads a Python object from a binary file.
+    """
+
     with open(dir_dumps+filename, 'rb') as f:
         print("loading "+filename+"...")
         obj = pickle.load(f)
